@@ -7,6 +7,10 @@ from network.client import Client
 
 class State:
 
+    LEADER = 'leader'
+    FOLLOWER = 'follower'
+    CANDIDATE = 'candidate'
+
     def __init__(self, server_ip_address, log, peers):
         self._server_id = server_ip_address
         self._voted_for = {}
@@ -14,6 +18,7 @@ class State:
         self._log = log
         self._peers = [Client(peer[0], peer[1]) for peer in peers]
         self._current_term = 0
+        self._total_votes = 0
 
     @property
     def leader_id(self):
@@ -59,6 +64,10 @@ class State:
     def server_id(self):
         return self._server_id
 
+    @property
+    def total_votes(self):
+        return self._total_votes
+
     def set_all_properties(self, state):
         self._current_term = state.current_term
         self._voted_for = state.voted_for
@@ -66,6 +75,7 @@ class State:
         self._log = state.log
         self._peers = state.peers
         self._server_id = state.server_id
+        self._total_votes = state.total_votes
 
     def __str__(self):
         return "State: current_term: {}, voted_for: {}, leader_id: {}".format(self._current_term, self._voted_for,

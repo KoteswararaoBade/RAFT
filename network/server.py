@@ -19,7 +19,7 @@ class Server(RPCServer):
     def __init__(self, server_id, host, port):
         super().__init__(host, port)
         self._id = server_id
-        self._data = {}
+        self._voted_for = {}
 
     def start(self):
         ip, port = self._server.server_address
@@ -36,28 +36,9 @@ class Server(RPCServer):
     def stop(self):
         self.server.stop()
 
-    def request_vote(self, term_number, candidate_id):
+    def request_vote(self, candidate_id, term_number):
         print('Received vote request from {} with term number {}'.format(candidate_id, term_number))
         return True
-
-    def get(self, key):
-        logger.info("get(%s)" % key)
-        if self.exists(key):
-            return self._data[key]
-        else:
-            return None
-
-    def set(self, key, value):
-        self._data[key] = value
-
-    def delete(self, key):
-        del self._data[key]
-
-    def exists(self, key):
-        return key in self._data
-
-    def keys(self):
-        return list(self._data.keys())
 
 
 def main():

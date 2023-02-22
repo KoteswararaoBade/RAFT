@@ -7,8 +7,8 @@ class Client(object):
         self.port = port
         self._rpc = RPCClient(host, port)
 
-    def send_request_vote(self, term, candidate_id):
-        return self._rpc.call("request_vote", term, candidate_id)
+    def send_request_vote(self, candidate_id, term):
+        return self._rpc.call("request_vote", candidate_id, term)
 
     def get(self, key):
         return self._rpc.call("get", key)
