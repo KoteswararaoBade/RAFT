@@ -6,6 +6,7 @@ import time
 from network.server import Server
 from state.follower import Follower
 from state.candidate import Candidate
+from state.leader import Leader
 from state.state import State
 
 from util.rpcutil import RPCServer
@@ -45,7 +46,7 @@ class ConsensusModule(RPCServer):
         elif state_type == State.CANDIDATE:
             state = Candidate(None, [], [])
         elif state_type == State.LEADER:
-            pass
+            state = Leader(None, [], [])
         state.set_all_properties(self.state)
         return state
 
@@ -82,9 +83,12 @@ class ConsensusModule(RPCServer):
         logger.info("=====================================")
         logger.info("Starting timer with election timeout of {} seconds".format(election_time_out))
         latest_timestamp = time.time()
-        while (time.time() - latest_timestamp) < election_time_out:
+        while (time.time() - latest_timestamp) < election_time_out or (not isinstance(self.state, Leader)):
             time.sleep(sleep_time)
         logger.info("Election timeout reached")
+        if isinstance(self.state, Leader):
+            logger.info("Not starting election since I am already leader")
+            return
         # start election on new thread
         t = threading.Thread(target=self.start_election)
         t.start()
