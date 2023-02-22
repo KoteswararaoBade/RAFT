@@ -21,6 +21,7 @@ class Candidate(State):
         for peer in self.peers:
             try:
                 response = peer.send_request_vote(self.server_id, self.current_term)
+                logger.info("Received response from peer {}: {}".format(peer, response))
                 if response:
                     peer_vote, peer_term_number = response
                     if peer_term_number > self.current_term:

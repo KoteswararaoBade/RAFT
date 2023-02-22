@@ -10,6 +10,9 @@ class Client(object):
     def send_request_vote(self, candidate_id, term):
         return self._rpc.call("request_vote", candidate_id, term)
 
+    def send_heart_beat(self, leader_id, term):
+        return self._rpc.call("heart_beat", leader_id, term)
+
     def get(self, key):
         return self._rpc.call("get", key)
 

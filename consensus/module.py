@@ -25,6 +25,7 @@ class ConsensusModule(RPCServer):
         super().__init__(host, port)
         self._id = (host, port)
         self.state = Follower((host, port), [], peers)
+        self.latest_timestamp = time.time()
 
     def start(self):
         host, port = self._id
@@ -34,6 +35,8 @@ class ConsensusModule(RPCServer):
         server_thread.start()
         logger.info("Server loop running in thread: %s" % server_thread.name)
         self.start_timer()
+        self.state = self.get_new_state(State.LEADER)
+        self.state.send_heart_beats()
 
     def stop(self):
         self.server.stop()
@@ -61,6 +64,19 @@ class ConsensusModule(RPCServer):
         self.state.current_term = term_number
         return True, self.state.current_term
 
+
+    def heart_beat(self, leader_id, term_number):
+        logger.info('Received heart beat from leader {} with term number {}'.format(leader_id, term_number))
+        if term_number < self.state.current_term:
+            logger.info('Rejecting heart beat from {} with term number {}'.format(leader_id, term_number))
+        else:
+            self.latest_timestamp = time.time()
+            logger.info('Acknowledging heart beat from {} with term number {}'.format(leader_id, term_number))
+            self.state.current_term = term_number
+            self.state.leader_id = leader_id
+            self.state = self.get_new_state(State.FOLLOWER)
+        return True, self.state.current_term
+
     def start_election(self):
         # upgrade state to candidate if not already candidate
         if isinstance(self.state, Follower):
@@ -82,8 +98,8 @@ class ConsensusModule(RPCServer):
         sleep_time = 0.2
         logger.info("=====================================")
         logger.info("Starting timer with election timeout of {} seconds".format(election_time_out))
-        latest_timestamp = time.time()
-        while (time.time() - latest_timestamp) < election_time_out or (not isinstance(self.state, Leader)):
+        self.latest_timestamp = time.time()
+        while (time.time() - self.latest_timestamp) < election_time_out and (not isinstance(self.state, Leader)):
             time.sleep(sleep_time)
         logger.info("Election timeout reached")
         if isinstance(self.state, Leader):
@@ -96,5 +112,5 @@ class ConsensusModule(RPCServer):
 
 
 if __name__ == '__main__':
-    consensus = ConsensusModule('10.181.93.155', 8080, [('10.181.91.9', 8080)])
+    consensus = ConsensusModule('10.181.93.155', 8080, [('10.181.94.243', 8080)])
     consensus.start()
