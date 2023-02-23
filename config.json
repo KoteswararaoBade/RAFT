@@ -1,0 +1,8 @@
+{
+  "host": "localhost",
+  "port": 8080,
+  "peers": [
+    {"host": "localhost", "port": 8080},
+    {"host": "localhost", "port": 8080}
+  ]
+}

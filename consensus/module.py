@@ -2,6 +2,7 @@ import os
 import random
 import threading
 import time
+import json
 
 from network.server import Server
 from state.follower import Follower
@@ -41,7 +42,6 @@ class ConsensusModule(RPCServer):
     def stop(self):
         self.server.stop()
 
-
     def get_new_state(self, state_type):
         state = None
         if state_type == State.FOLLOWER:
@@ -53,7 +53,6 @@ class ConsensusModule(RPCServer):
         state.set_all_properties(self.state)
         return state
 
-
     def request_vote(self, candidate_id, term_number):
         logger.info('Received vote request from {} with term number {}'.format(candidate_id, term_number))
         if term_number < self.state.current_term or term_number in self.state.voted_for:
@@ -63,7 +62,6 @@ class ConsensusModule(RPCServer):
         self.state.voted_for[term_number] = candidate_id
         self.state.current_term = term_number
         return True, self.state.current_term
-
 
     def heart_beat(self, leader_id, term_number):
         logger.info('Received heart beat from leader {} with term number {}'.format(leader_id, term_number))
@@ -92,7 +90,6 @@ class ConsensusModule(RPCServer):
             logger.info("Upgrading state to leader")
             self.state = self.get_new_state(State.LEADER)
 
-
     def start_timer(self):
         election_time_out = get_random_election_timeout(5000, 8000)
         sleep_time = 0.2
@@ -111,6 +108,18 @@ class ConsensusModule(RPCServer):
         self.start_timer()
 
 
-if __name__ == '__main__':
-    consensus = ConsensusModule('10.181.93.155', 8080, [('10.181.94.243', 8080)])
+def process_json_config(filename):
+    with open(filename) as f:
+        config = json.load(f)
+    return config
+
+
+def run():
+    config_json = process_json_config('../config.json')
+    peers = [(peer['host'], peer['port']) for peer in config_json['peers']]
+    consensus = ConsensusModule(config_json['host'], config_json['port'], peers)
     consensus.start()
+
+
+if __name__ == '__main__':
+    run()
