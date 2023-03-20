@@ -9,7 +9,7 @@ class Message(object):
         self._timestamp = time.time()
 
     def __str__(self):
-        return "Message(content=%s, term=%s, timestamp=%s)" % (self._content, self._term, self._timestamp)
+        return "Message(content=%s, term=%s, timestamp=%s)" % (self._content, self._term_number, self._timestamp)
 
     def __repr__(self):
         return self.__str__()
