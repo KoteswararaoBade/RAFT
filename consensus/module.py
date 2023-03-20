@@ -58,10 +58,11 @@ class ConsensusModule(RPCServer):
 
     def request_vote(self, message):
         # sender details
-        sender_candidate_id = message.content['candidate_id']
-        sender_last_log_index = message.content['last_log_index']
-        sender_last_log_term = message.content['last_log_term']
-        sender_term_number = message.term_number
+        print(message['_content'], "message")
+        sender_candidate_id = message['_content']['candidate_id']
+        sender_last_log_index = message['_content']['last_log_index']
+        sender_last_log_term = message['_content']['last_log_term']
+        sender_term_number = message['_term_number']
         # peer details
         peer_last_log_index = len(self.state.log) - 1
         peer_last_log_term = self.state.log[peer_last_log_index].term_number
