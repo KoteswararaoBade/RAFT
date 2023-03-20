@@ -1,5 +1,6 @@
 import os
 
+from message.request_vote_message import RequestVoteMessage
 from .state import State
 from util.loggingutil import LoggingUtil
 
@@ -7,8 +8,16 @@ logger = LoggingUtil(os.path.basename(__file__)).get_logger()
 
 class Candidate(State):
 
-    def __init__(self, server_ip_address,  log, peers):
-        super().__init__(server_ip_address, log, peers)
+    def __init__(self, server_ip_address, peers):
+        super().__init__(server_ip_address, peers)
+
+
+    def build_request_vote_message(self):
+        last_log_index = len(self.log) - 1
+        last_log_term = self.log[last_log_index].term_number
+        content = {'candidate_id': self.server_id, 'last_log_index': last_log_index,
+                   'last_log_term': last_log_term}
+        return RequestVoteMessage(self.current_term, content)
 
     def start_election(self):
         # set current term
@@ -20,7 +29,7 @@ class Candidate(State):
         # send request vote RPCs to all other servers
         for peer in self.peers:
             try:
-                response = peer.send_request_vote(self.server_id, self.current_term)
+                response = peer.send_request_vote(self.build_request_vote_message())
                 logger.info("Received response from peer {}: {}".format(peer, response))
                 if response:
                     peer_vote, peer_term_number = response

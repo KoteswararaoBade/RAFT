@@ -11,8 +11,8 @@ def get_random_election_timeout(start, end):
 
 class Follower(State):
 
-    def __init__(self, server_ip_address, log, peers):
-        super().__init__(server_ip_address, log, peers)
+    def __init__(self, server_ip_address, peers):
+        super().__init__(server_ip_address, peers)
 
     def join_cluster(self):
         pass

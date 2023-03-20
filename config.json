@@ -1,8 +1,8 @@
 {
-  "host": "localhost",
+  "host": "10.181.90.207",
   "port": 8080,
   "peers": [
-    {"host": "localhost", "port": 8080},
-    {"host": "localhost", "port": 8080}
+    {"host": "10.181.91.243", "port": 8080},
+    {"host": "10.181.89.210", "port": 8080}
   ]
 }
