@@ -41,7 +41,7 @@ class ConsensusModule(RPCServer):
         logger.info("Server loop running in thread: %s" % server_thread.name)
         self.start_timer()
         self.state = self.get_new_state(State.LEADER)
-        self.state.send_heart_beats(self.heartbeat_interval)
+        self.send_heart_beats(self.heartbeat_interval)
 
     def stop(self):
         self.server.stop()
@@ -109,7 +109,7 @@ class ConsensusModule(RPCServer):
     def heart_beat(self, leader_id, term_number):
         logger.info('Received heart beat from leader {} with term number {}'.format(leader_id, term_number))
         if term_number < self.state.current_term:
-            logger.info('Rejecting heart beat from {} with term number {}'.format(leader_id, term_number))
+            logger.info('Rejecting heart beat from {} as current term number is {}'.format(leader_id, self.state.current_term))
         else:
             self.reset_timer()
             logger.info('Acknowledging heart beat from {} with term number {}'.format(leader_id, term_number))
@@ -117,6 +117,18 @@ class ConsensusModule(RPCServer):
             self.state.leader_id = leader_id
             self.state = self.get_new_state(State.FOLLOWER)
         return True, self.state.current_term
+
+    def send_heart_beats(self, heart_beat_interval):
+        while True:
+            if not isinstance(self.state, Leader):
+                break
+            for peer in self.state.peers:
+                try:
+                    logger.info('Sending heart beat to peer {}'.format(peer))
+                    peer.send_heart_beat(self.state.server_id, self.state.current_term)
+                except Exception as e:
+                    logger.error('Error sending heart beat to peer {}'.format(peer))
+            time.sleep(heart_beat_interval)
 
     def start_election(self):
         # upgrade state to candidate if not already candidate

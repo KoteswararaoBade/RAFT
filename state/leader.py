@@ -31,14 +31,3 @@ class Leader(State):
     @match_index.setter
     def match_index(self, match_index):
         self._match_index = match_index
-
-
-    def send_heart_beats(self, heart_beat_interval):
-        while True:
-            for peer in self.peers:
-                try:
-                    logger.info('Sending heart beat to peer {}'.format(peer))
-                    peer.send_heart_beat(self.server_id, self.current_term)
-                except Exception as e:
-                    logger.error('Error sending heart beat to peer {}'.format(peer))
-            time.sleep(heart_beat_interval)
