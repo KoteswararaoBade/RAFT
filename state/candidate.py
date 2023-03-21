@@ -25,6 +25,7 @@ class Candidate(State):
         logger.info("Starting election for term {}".format(self.current_term))
         # vote for self
         self._voted_for[self.current_term] = self.server_id
+        self._total_votes = 1
         # reset election timeout
         # send request vote RPCs to all other servers
         for peer in self.peers:
