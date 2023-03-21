@@ -22,11 +22,15 @@ def get_random_election_timeout(start, end):
 
 class ConsensusModule(RPCServer):
 
-    def __init__(self, host, port, peers):
+    def __init__(self, host, port, peers, election_timeout_range, heartbeat_interval, sleep_time):
         super().__init__(host, port)
         self._id = (host, port)
         self.state = Follower((host, port), peers)
         self.latest_timestamp = time.time()
+        self.election_timeout_start = election_timeout_range[0]
+        self.election_timeout_end = election_timeout_range[1]
+        self.heartbeat_interval = heartbeat_interval/1000
+        self.sleep_time = sleep_time/1000
 
     def start(self):
         host, port = self._id
@@ -37,7 +41,7 @@ class ConsensusModule(RPCServer):
         logger.info("Server loop running in thread: %s" % server_thread.name)
         self.start_timer()
         self.state = self.get_new_state(State.LEADER)
-        self.state.send_heart_beats()
+        self.state.send_heart_beats(self.heartbeat_interval)
 
     def stop(self):
         self.server.stop()
@@ -58,7 +62,6 @@ class ConsensusModule(RPCServer):
 
     def request_vote(self, message):
         # sender details
-        print(message['_content'], "message")
         sender_candidate_id = message['_content']['candidate_id']
         sender_last_log_index = message['_content']['last_log_index']
         sender_last_log_term = message['_content']['last_log_term']
@@ -131,17 +134,16 @@ class ConsensusModule(RPCServer):
             self.state = self.get_new_state(State.LEADER)
 
     def start_timer(self):
-        election_time_out = get_random_election_timeout(5000, 8000)
-        sleep_time = 0.2
+        election_time_out = get_random_election_timeout(self.election_timeout_start, self.election_timeout_end)
         logger.info("=====================================")
         logger.info("Starting timer with election timeout of {} seconds".format(election_time_out))
         self.reset_timer()
         while (time.time() - self.latest_timestamp) < election_time_out and (not isinstance(self.state, Leader)):
-            time.sleep(sleep_time)
-        logger.info("Election timeout reached")
+            time.sleep(self.sleep_time)
         if isinstance(self.state, Leader):
-            logger.info("Not starting election since I am already leader")
+            logger.info("I am leader so election timeout not required")
             return
+        logger.info("Election timeout reached")
         # start election on new thread
         t = threading.Thread(target=self.start_election)
         t.start()
@@ -157,7 +159,10 @@ def process_json_config(filename):
 def run():
     config_json = process_json_config('../config.json')
     peers = [(peer['host'], peer['port']) for peer in config_json['peers']]
-    consensus = ConsensusModule(config_json['host'], config_json['port'], peers)
+    election_timeout_range = config_json['election_timeout_range']
+    heartbeat_interval = config_json['heartbeat_interval']
+    sleep_time = config_json['sleep_time']
+    consensus = ConsensusModule(config_json['host'], config_json['port'], peers, election_timeout_range, heartbeat_interval, sleep_time)
     consensus.start()
 
 
