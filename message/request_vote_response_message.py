@@ -5,5 +5,5 @@ from message.message_type import MessageType
 class RequestVoteResponseMessage(Message):
     """Request vote reponse message."""
 
-    def __init__(self, term, content):
-        super(RequestVoteResponseMessage, self).__init__(term, content)
+    def __init__(self, term):
+        super(RequestVoteResponseMessage, self).__init__(term)
