@@ -4,10 +4,7 @@ import threading
 import time
 import json
 
-from network.server import Server
-from state.follower import Follower
-from state.candidate import Candidate
-from state.leader import Leader
+from message.request_vote_message import RequestVoteMessage
 from state.state import State
 
 from util.rpcutil import RPCServer
@@ -25,7 +22,7 @@ class ConsensusModule(RPCServer):
     def __init__(self, host, port, peers, election_timeout_range, heartbeat_interval, sleep_time):
         super().__init__(host, port)
         self._id = (host, port)
-        self.state = Follower((host, port), peers)
+        self.state = State((host, port), peers, State.FOLLOWER)
         self.latest_timestamp = time.time()
         self.election_timeout_start = election_timeout_range[0]
         self.election_timeout_end = election_timeout_range[1]
@@ -40,26 +37,30 @@ class ConsensusModule(RPCServer):
         server_thread.start()
         logger.info("Server loop running in thread: %s" % server_thread.name)
         self.start_timer()
-        self.state = self.get_new_state(State.LEADER)
+        self.state.state_type = State.LEADER
+        # self.state = self.get_new_state(State.LEADER)
         self.send_heart_beats(self.heartbeat_interval)
 
     def stop(self):
         self.server.stop()
 
-    def get_new_state(self, state_type):
-        state = None
-        if state_type == State.FOLLOWER:
-            state = Follower(None, [])
-        elif state_type == State.CANDIDATE:
-            state = Candidate(None, [])
-        elif state_type == State.LEADER:
-            state = Leader(None, [])
-        state.set_all_properties(self.state)
-        return state
+
+    # TODO: implement this
+    # def get_new_state(self, state_type):
+    #     state = None
+    #     if state_type == State.FOLLOWER:
+    #         state = Follower(None, [])
+    #     elif state_type == State.CANDIDATE:
+    #         state = Candidate(None, [])
+    #     elif state_type == State.LEADER:
+    #         state = Leader(None, [])
+    #     state.set_all_properties(self.state)
+    #     return state
 
     def reset_timer(self):
         self.latest_timestamp = time.time()
 
+    # REQUEST VOTE RPC RECEIVER
     def request_vote(self, message):
         # sender details
         sender_candidate_id = message['_candidate_id']
@@ -88,9 +89,10 @@ class ConsensusModule(RPCServer):
             return False, self.state.current_term
 
         # if peer's term number is less than sender's term number, then downgrade peer's state to follower
-        if not isinstance(self.state, Follower):
+        if self.state.state_type != State.FOLLOWER:
             logger.info("Downgrading state to follower")
-            self.state = self.get_new_state(State.FOLLOWER)
+            self.state.state_type = State.FOLLOWER
+            # self.state = self.get_new_state(State.FOLLOWER)
             # reset election timeout
             self.reset_timer()
 
@@ -106,6 +108,7 @@ class ConsensusModule(RPCServer):
         self.state.voted_for[self.state.current_term] = sender_candidate_id
         return True, self.state.current_term
 
+    # HEART BEAT RPC RECEIVER
     def heart_beat(self, leader_id, term_number):
         logger.info('Received heart beat from leader {} with term number {}'.format(leader_id, term_number))
         if term_number < self.state.current_term:
@@ -115,12 +118,14 @@ class ConsensusModule(RPCServer):
             logger.info('Acknowledging heart beat from {} with term number {}'.format(leader_id, term_number))
             self.state.current_term = term_number
             self.state.leader_id = leader_id
-            self.state = self.get_new_state(State.FOLLOWER)
+            self.state.state_type = State.FOLLOWER
+            # self.state = self.get_new_state(State.FOLLOWER)
         return True, self.state.current_term
 
+    # SEND HEART BEAT RPC
     def send_heart_beats(self, heart_beat_interval):
         while True:
-            if not isinstance(self.state, Leader):
+            if self.state.state_type != State.LEADER:
                 break
             for peer in self.state.peers:
                 try:
@@ -130,29 +135,66 @@ class ConsensusModule(RPCServer):
                     logger.error('Error sending heart beat to peer {}'.format(peer))
             time.sleep(heart_beat_interval)
 
+    # SEND REQUEST VOTE RPC
+    def send_request_vote(self, peer):
+        try:
+            response = peer.send_request_vote(self.build_request_vote_message())
+            logger.info("Received response from peer {}: {}".format(peer, response))
+            if response:
+                peer_vote, peer_term_number = response
+                if peer_term_number > self.state.current_term:
+                    # demote to follower
+                    return State.FOLLOWER, peer_term_number
+                elif peer_term_number == self.state.current_term:
+                    if peer_vote:
+                        self.state.total_votes += 1
+                        if 2 * self.state.total_votes > len(self.state.peers) + 1:
+                            # become leader
+                            return State.LEADER, self.state.current_term
+        except Exception as e:
+            logger.error("Error while sending request vote to peer {}: {}".format(peer, e))
+        return State.CANDIDATE, self.state.current_term
+
     def start_election(self):
         # upgrade state to candidate if not already candidate
-        if isinstance(self.state, Follower):
+        if self.state.state_type == State.FOLLOWER:
             logger.info("Upgrading state to candidate")
-            self.state = self.get_new_state(State.CANDIDATE)
+            self.state.state_type = State.CANDIDATE
+            # self.state = self.get_new_state(State.CANDIDATE)
         # send request vote to all peers
-        next_state_type, term = self.state.start_election()
-        if next_state_type == State.FOLLOWER:
-            logger.info("Downgrading state to follower")
-            self.state = self.get_new_state(State.FOLLOWER)
-        # if majority votes for you, become leader
-        elif next_state_type == State.LEADER:
-            logger.info("Upgrading state to leader")
-            self.state = self.get_new_state(State.LEADER)
+        self.state.current_term += 1
+        logger.info("Starting election for term {}".format(self.state.current_term))
+        # vote for self
+        self.state.voted_for[self.state.current_term] = self.state.server_id
+        self.state.total_votes = 1
+        for peer in self.state.peers:
+            next_state_type, term = self.send_request_vote(peer)
+            if next_state_type == State.FOLLOWER:
+                logger.info("Downgrading state to follower")
+                self.state.state_type = State.FOLLOWER
+                # self.state = self.get_new_state(State.FOLLOWER)
+                break
+            # if majority votes for you, become leader
+            elif next_state_type == State.LEADER:
+                logger.info("Upgrading state to leader")
+                self.state.state_type = State.LEADER
+                # self.state = self.get_new_state(State.LEADER)
+                break
+
+    # build request vote message
+    def build_request_vote_message(self):
+        last_log_index = len(self.state.log) - 1
+        last_log_term = self.state.log[last_log_index].term_number
+        return RequestVoteMessage(self.state.current_term, self.state.server_id, last_log_index, last_log_term)
 
     def start_timer(self):
         election_time_out = get_random_election_timeout(self.election_timeout_start, self.election_timeout_end)
         logger.info("=====================================")
         logger.info("Starting timer with election timeout of {} seconds".format(election_time_out))
         self.reset_timer()
-        while (time.time() - self.latest_timestamp) < election_time_out and (not isinstance(self.state, Leader)):
+        while (time.time() - self.latest_timestamp) < election_time_out and (self.state.state_type != State.LEADER):
             time.sleep(self.sleep_time)
-        if isinstance(self.state, Leader):
+        if self.state.state_type == State.LEADER:
             logger.info("I am leader so election timeout not required")
             return
         logger.info("Election timeout reached")
@@ -167,7 +209,6 @@ def process_json_config(filename):
         config = json.load(f)
     return config
 
-
 def run():
     config_json = process_json_config('../config.json')
     peers = [(peer['host'], peer['port']) for peer in config_json['peers']]
@@ -176,6 +217,9 @@ def run():
     sleep_time = config_json['sleep_time']
     consensus = ConsensusModule(config_json['host'], config_json['port'], peers, election_timeout_range, heartbeat_interval, sleep_time)
     consensus.start()
+    # run below in a separate thread
+    # uvicorn.run(app, host="localhost", port=8000)
+    # threading.Thread(target=uvicorn.run, args=(app,), kwargs={'host': 'localhost', 'port': 8000}).start()
 
 
 if __name__ == '__main__':

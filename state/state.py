@@ -12,7 +12,7 @@ class State:
     FOLLOWER = 'follower'
     CANDIDATE = 'candidate'
 
-    def __init__(self, server_ip_address, peers):
+    def __init__(self, server_ip_address, peers, state_type):
         # peer information
         self._server_id = server_ip_address
         self._peers = [Client(peer[0], peer[1]) for peer in peers]
@@ -25,6 +25,21 @@ class State:
         self._commit_index = 0
         self._last_applied = 0
         self._total_votes = 0
+
+        # variable to keep track of state
+        self._state_type = None
+
+        # leader state
+        self._next_index = {(peer[0], peer[1]): len(self.log) + 1 for peer in peers}
+        self._match_index = {(peer[0], peer[1]): 0 for peer in peers}
+
+    @property
+    def state_type(self):
+        return self._state_type
+
+    @state_type.setter
+    def state_type(self, state_type):
+        self._state_type = state_type
 
     @property
     def leader_id(self):
@@ -74,6 +89,10 @@ class State:
     def total_votes(self):
         return self._total_votes
 
+    @total_votes.setter
+    def total_votes(self, total_votes):
+        self._total_votes = total_votes
+
     @property
     def commit_index(self):
         return self._commit_index
@@ -85,6 +104,22 @@ class State:
     @property
     def last_applied(self):
         return self._last_applied
+
+    @property
+    def next_index(self):
+        return self._next_index
+
+    @next_index.setter
+    def next_index(self, next_index):
+        self._next_index = next_index
+
+    @property
+    def match_index(self):
+        return self._match_index
+
+    @match_index.setter
+    def match_index(self, match_index):
+        self._match_index = match_index
 
 
     def set_all_properties(self, state):
