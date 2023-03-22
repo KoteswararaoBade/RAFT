@@ -4,12 +4,11 @@ from message.message import Message
 class RequestVoteMessage(Message):
     """Request vote message."""
 
-    def __init__(self, term, content):
-        super(RequestVoteMessage, self).__init__(term, content)
-        self._candidate_id = content['candidate_id']
-        self._last_log_index = content['last_log_index']
-        self._last_log_term = content['last_log_term']
-
+    def __init__(self, term, candidate_id, last_log_index, last_log_term):
+        super(RequestVoteMessage, self).__init__(term)
+        self._candidate_id = candidate_id
+        self._last_log_index = last_log_index
+        self._last_log_term = last_log_term
 
     @property
     def candidate_id(self):

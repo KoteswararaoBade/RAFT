@@ -15,9 +15,7 @@ class Candidate(State):
     def build_request_vote_message(self):
         last_log_index = len(self.log) - 1
         last_log_term = self.log[last_log_index].term_number
-        content = {'candidate_id': self.server_id, 'last_log_index': last_log_index,
-                   'last_log_term': last_log_term}
-        return RequestVoteMessage(self.current_term, content)
+        return RequestVoteMessage(self.current_term, self.server_id, last_log_index, last_log_term)
 
     def start_election(self):
         # set current term
