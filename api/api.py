@@ -21,6 +21,7 @@ class Service:
         self.router = APIRouter()
         self.router.add_api_route("/get/{item_id}", self.get, methods=["GET"])
         self.router.add_api_route("/put/{key}/{value}", self.put, methods=["GET"])
+        self.dict = {}
     def get(self, item_id):
         return "hello"
     def put(self, key, value):

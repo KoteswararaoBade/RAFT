@@ -129,7 +129,33 @@ class ConsensusModule(RPCServer):
         return True, self.state.current_term
 
     def append_entries(self, message):
-        print(message)
+        leader_term_number = message['_term_number']
+        leader_id = message['_leader_id']
+        leader_prev_log_index = message['_prev_log_index']
+        leader_prev_log_term = message['_prev_log_term']
+        if leader_term_number < self.state.current_term:
+            return False, self.state.current_term, None
+        if len(self.state.log) <= leader_prev_log_index:
+            return False, self.state.current_term, len(self.state.log) - 1
+        if self.state.log[leader_prev_log_index].term_number != leader_prev_log_term:
+            mismatched_term_number = self.state.log[leader_prev_log_index].term_number
+            index = leader_prev_log_index
+            while self.state.log[index].term_number == mismatched_term_number:
+                index -= 1
+            return False, self.state.current_term, index
+        # positive case
+        # if there are some entries in the log which are above the leader's prev log index, then delete them
+        if len(self.state.log) > leader_prev_log_index + 1:
+            self.state.log = self.state.log[:leader_prev_log_index + 1]
+        # append the entries from leader's log to peer's log
+        entries = message['_entries']
+        for entry in entries:
+            self.state.log.append(LogEntry(entry['_term_number'], entry['_command']))
+        # if leader's commit index is greater than peer's commit index, then update peer's commit index
+        if message['_leader_commit'] > self.state.commit_index:
+            self.state.commit_index = min(message['_leader_commit'], len(self.state.log) - 1)
+        print("log: {}".format(self.state.log))
+        return True, self.state.current_term, None
 
     # ==================================================================================
     # RPC SENDERS
@@ -178,6 +204,7 @@ class ConsensusModule(RPCServer):
                 logger.info('Sending append entries to peer {}'.format(peer))
                 message = self._build_append_entries_message(peer)
                 response = peer.send_append_entries(message)
+                print(response)
             except Exception as e:
                 logger.error('Error sending append entries to peer {}'.format(peer))
 
