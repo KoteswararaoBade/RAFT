@@ -40,24 +40,19 @@ class ConsensusModule(RPCServer):
         logger.info("Server loop running in thread: %s" % server_thread.name)
         self.start_timer()
         self.state.state_type = State.LEADER
+        self.change_state_properties()
         # self.state = self.get_new_state(State.LEADER)
         self.send_heart_beats(self.heartbeat_interval)
 
     def stop(self):
         self.server.stop()
 
-
-    # TODO: implement this
-    # def get_new_state(self, state_type):
-    #     state = None
-    #     if state_type == State.FOLLOWER:
-    #         state = Follower(None, [])
-    #     elif state_type == State.CANDIDATE:
-    #         state = Candidate(None, [])
-    #     elif state_type == State.LEADER:
-    #         state = Leader(None, [])
-    #     state.set_all_properties(self.state)
-    #     return state
+    def change_state_properties(self):
+        if self.state.state_type == State.FOLLOWER:
+            self.state.total_votes = 0
+        elif self.state.state_type == State.LEADER:
+            self.state.next_index = {(peer.host, peer.port): len(self.state.log) + 1 for peer in self.state.peers}
+            self.state.match_index = {(peer.host, peer.port): 0 for peer in self.state.peers}
 
     def reset_timer(self):
         self.latest_timestamp = time.time()
@@ -98,6 +93,7 @@ class ConsensusModule(RPCServer):
         if self.state.state_type != State.FOLLOWER:
             logger.info("Downgrading state to follower")
             self.state.state_type = State.FOLLOWER
+            self.change_state_properties()
             # self.state = self.get_new_state(State.FOLLOWER)
             # reset election timeout
             self.reset_timer()
@@ -125,7 +121,7 @@ class ConsensusModule(RPCServer):
             self.state.current_term = term_number
             self.state.leader_id = leader_id
             self.state.state_type = State.FOLLOWER
-            # self.state = self.get_new_state(State.FOLLOWER)
+            self.change_state_properties()
         return True, self.state.current_term
 
     def append_entries(self, message):
@@ -211,13 +207,13 @@ class ConsensusModule(RPCServer):
                 response = peer.send_append_entries(message)
                 print(response)
             except Exception as e:
-                logger.error('Error sending append entries to peer {}'.format(peer))
+                logger.error('Error sending append entries to peer {}'.format(e))
 
     def _build_append_entries_message(self, peer):
         peer = (peer.host, peer.port)
         term = self.state.current_term
         leader_id = self.state.server_id
-        prev_log_index = len(self.state.log) - 1
+        prev_log_index = len(self.state.log) - 2
         prev_log_term = self.state.log[prev_log_index].term_number
         entries = self.state.log[self.state.next_index[peer] - 1:]
         leader_commit = self.state.commit_index
@@ -228,7 +224,7 @@ class ConsensusModule(RPCServer):
         if self.state.state_type == State.FOLLOWER:
             logger.info("Upgrading state to candidate")
             self.state.state_type = State.CANDIDATE
-            # self.state = self.get_new_state(State.CANDIDATE)
+            self.change_state_properties()
         # send request vote to all peers
         self.state.current_term += 1
         logger.info("Starting election for term {}".format(self.state.current_term))
@@ -240,13 +236,13 @@ class ConsensusModule(RPCServer):
             if next_state_type == State.FOLLOWER:
                 logger.info("Downgrading state to follower")
                 self.state.state_type = State.FOLLOWER
-                # self.state = self.get_new_state(State.FOLLOWER)
+                self.change_state_properties()
                 break
             # if majority votes for you, become leader
             elif next_state_type == State.LEADER:
                 logger.info("Upgrading state to leader")
                 self.state.state_type = State.LEADER
-                # self.state = self.get_new_state(State.LEADER)
+                self.change_state_properties()
                 break
 
     # build request vote message
