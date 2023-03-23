@@ -13,6 +13,9 @@ class Client(object):
     def send_heart_beat(self, leader_id, term):
         return self._rpc.call("heart_beat", leader_id, term)
 
+    def send_append_entries(self, message):
+        return self._rpc.call("append_entries", message)
+
     def get(self, key):
         return self._rpc.call("get", key)
 

@@ -4,6 +4,8 @@ import threading
 import time
 import json
 
+from log.log import LogEntry
+from message.append_entries_message import AppendEntriesMessage
 from message.request_vote_message import RequestVoteMessage
 from state.state import State
 
@@ -59,6 +61,10 @@ class ConsensusModule(RPCServer):
 
     def reset_timer(self):
         self.latest_timestamp = time.time()
+
+    # ==================================================================================
+    # RPC RECEIVERS
+    # ==================================================================================
 
     # REQUEST VOTE RPC RECEIVER
     def request_vote(self, message):
@@ -122,6 +128,13 @@ class ConsensusModule(RPCServer):
             # self.state = self.get_new_state(State.FOLLOWER)
         return True, self.state.current_term
 
+    def append_entries(self, message):
+        print(message)
+
+    # ==================================================================================
+    # RPC SENDERS
+    # ==================================================================================
+
     # SEND HEART BEAT RPC
     def send_heart_beats(self, heart_beat_interval):
         while True:
@@ -154,6 +167,29 @@ class ConsensusModule(RPCServer):
         except Exception as e:
             logger.error("Error while sending request vote to peer {}: {}".format(peer, e))
         return State.CANDIDATE, self.state.current_term
+
+    # SEND APPEND ENTRIES RPC
+    def send_append_entries(self, command):
+        # insert this command in the log
+        log_entry = LogEntry(self.state.current_term, command)
+        self.state.log.append(log_entry)
+        for peer in self.state.peers:
+            try:
+                logger.info('Sending append entries to peer {}'.format(peer))
+                message = self._build_append_entries_message(peer)
+                response = peer.send_append_entries(message)
+            except Exception as e:
+                logger.error('Error sending append entries to peer {}'.format(peer))
+
+    def _build_append_entries_message(self, peer):
+        peer = (peer.host, peer.port)
+        term = self.state.current_term
+        leader_id = self.state.server_id
+        prev_log_index = len(self.state.log) - 1
+        prev_log_term = self.state.log[prev_log_index].term_number
+        entries = self.state.log[self.state.next_index[peer] - 1:]
+        leader_commit = self.state.commit_index
+        return AppendEntriesMessage(term, leader_id, prev_log_index, prev_log_term, entries, leader_commit)
 
     def start_election(self):
         # upgrade state to candidate if not already candidate
