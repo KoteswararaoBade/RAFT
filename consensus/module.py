@@ -129,6 +129,7 @@ class ConsensusModule(RPCServer):
         return True, self.state.current_term
 
     def append_entries(self, message):
+        print('Received append entries request message {}'.format(message))
         leader_term_number = message['_term_number']
         leader_id = message['_leader_id']
         leader_prev_log_index = message['_prev_log_index']
@@ -136,8 +137,12 @@ class ConsensusModule(RPCServer):
         if leader_term_number < self.state.current_term:
             return False, self.state.current_term, None
         if len(self.state.log) <= leader_prev_log_index:
+            print('Rejecting append entries request as peer log is shorter than leader log')
+            print('Peer log: {}'.format(self.state.log))
             return False, self.state.current_term, len(self.state.log) - 1
         if self.state.log[leader_prev_log_index].term_number != leader_prev_log_term:
+            print('Rejecting append entries request as peer log is not in sync with leader log')
+            print('Peer log: {}'.format(self.state.log))
             mismatched_term_number = self.state.log[leader_prev_log_index].term_number
             index = leader_prev_log_index
             while self.state.log[index].term_number == mismatched_term_number:
