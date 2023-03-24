@@ -16,6 +16,9 @@ class Client(object):
     def send_append_entries(self, message):
         return self._rpc.call("append_entries", message)
 
+    def send_redirect_message(self, message):
+        return self._rpc.call("redirect_message", message)
+
     def get(self, key):
         return self._rpc.call("get", key)
 

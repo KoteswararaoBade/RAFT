@@ -158,6 +158,11 @@ class ConsensusModule(RPCServer):
         print("log: {}".format(self.state.log))
         return True, self.state.current_term, None
 
+
+    def redirect_message(self, message):
+        print('Redirect message received')
+        print(message)
+
     # ==================================================================================
     # RPC SENDERS
     # ==================================================================================
@@ -195,8 +200,21 @@ class ConsensusModule(RPCServer):
             logger.error("Error while sending request vote to peer {}: {}".format(peer, e))
         return State.CANDIDATE, self.state.current_term
 
+    # SEND REDIRECT MESSAGE
+
+    def send_redirect_message(self, peer):
+        try:
+            peer.send_redirect_message(self.state.leader_id)
+        except Exception as e:
+            logger.error("Error while sending redirect message to peer {}: {}".format(peer, e))
+
     # SEND APPEND ENTRIES RPC
     def send_append_entries(self, command):
+        # check if I am leader if no redirect to leader
+        if self.state.state_type != State.LEADER:
+            for peer in self.state.peers:
+                if peer.host == self.state.leader_id[0] and peer.port == self.state.leader_id[1]:
+                    return self.send_redirect_message(peer)
         # insert this command in the log
         log_entry = LogEntry(self.state.current_term, command)
         self.state.log.append(log_entry)
@@ -211,7 +229,7 @@ class ConsensusModule(RPCServer):
             thread.join()
         if 2 * num_of_successful_replications[0] > len(self.state.peers):
             self.state.commit_index = current_index
-            print('Current commit index'.format(self.state.commit_index))
+            print('Current commit index {}'.format(self.state.commit_index))
             return True
         return False
 
@@ -276,6 +294,7 @@ class ConsensusModule(RPCServer):
             elif next_state_type == State.LEADER:
                 logger.info("Upgrading state to leader")
                 self.state.state_type = State.LEADER
+                self.state.leader_id = self.state.server_id
                 self.change_state_properties()
                 break
 
