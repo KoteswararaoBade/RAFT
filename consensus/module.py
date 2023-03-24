@@ -202,9 +202,9 @@ class ConsensusModule(RPCServer):
 
     # SEND REDIRECT MESSAGE
 
-    def send_redirect_message(self, peer):
+    def send_redirect_message(self, peer, command):
         try:
-            peer.send_redirect_message(self.state.leader_id)
+            peer.send_redirect_message(command)
         except Exception as e:
             logger.error("Error while sending redirect message to peer {}: {}".format(peer, e))
 
@@ -214,7 +214,7 @@ class ConsensusModule(RPCServer):
         if self.state.state_type != State.LEADER:
             for peer in self.state.peers:
                 if peer.host == self.state.leader_id[0] and peer.port == self.state.leader_id[1]:
-                    return self.send_redirect_message(peer)
+                    return self.send_redirect_message(peer, command)
         # insert this command in the log
         log_entry = LogEntry(self.state.current_term, command)
         self.state.log.append(log_entry)
