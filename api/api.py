@@ -4,7 +4,6 @@ import threading
 import uvicorn
 from fastapi import FastAPI, APIRouter
 
-
 from consensus.module import ConsensusModule
 
 app = FastAPI()
@@ -22,12 +21,13 @@ class Service:
         self.router.add_api_route("/get/{item_id}", self.get, methods=["GET"])
         self.router.add_api_route("/put/{key}/{value}", self.put, methods=["GET"])
         self.dict = {}
+
     def get(self, item_id):
         return "hello"
     def put(self, key, value):
         command = {"command": "put", "key": key, "value": value}
         result = self.consensus_module.send_append_entries(command)
-        return {"key": key, "value": value}
+        return result
 
     def run_consensus_module(self):
         config_json = process_json_config('../config.json')

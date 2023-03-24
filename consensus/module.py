@@ -135,7 +135,7 @@ class ConsensusModule(RPCServer):
         if len(self.state.log) <= leader_prev_log_index:
             print('Rejecting append entries request as peer log is shorter than leader log')
             print('Peer log: {}'.format(self.state.log))
-            return False, self.state.current_term, len(self.state.log) - 1
+            return False, self.state.current_term, len(self.state.log)
         if self.state.log[leader_prev_log_index].term_number != leader_prev_log_term:
             print('Rejecting append entries request as peer log is not in sync with leader log')
             print('Peer log: {}'.format(self.state.log))
@@ -143,7 +143,7 @@ class ConsensusModule(RPCServer):
             index = leader_prev_log_index
             while self.state.log[index].term_number == mismatched_term_number:
                 index -= 1
-            return False, self.state.current_term, index
+            return False, self.state.current_term, index + 1
         # positive case
         # if there are some entries in the log which are above the leader's prev log index, then delete them
         if len(self.state.log) > leader_prev_log_index + 1:
@@ -188,7 +188,7 @@ class ConsensusModule(RPCServer):
                 elif peer_term_number == self.state.current_term:
                     if peer_vote:
                         self.state.total_votes += 1
-                        if 2 * self.state.total_votes > len(self.state.peers) + 1:
+                        if 2 * self.state.total_votes > len(self.state.peers):
                             # become leader
                             return State.LEADER, self.state.current_term
         except Exception as e:
@@ -200,22 +200,56 @@ class ConsensusModule(RPCServer):
         # insert this command in the log
         log_entry = LogEntry(self.state.current_term, command)
         self.state.log.append(log_entry)
+        current_index = len(self.state.log) - 1
+        threads = []
+        num_of_successful_replications = [1]
         for peer in self.state.peers:
-            try:
-                logger.info('Sending append entries to peer {}'.format(peer))
-                message = self._build_append_entries_message(peer)
-                response = peer.send_append_entries(message)
-                print(response)
-            except Exception as e:
-                logger.error('Error sending append entries to peer {}'.format(e))
+            thread = threading.Thread(target=self.call_peer_append_entries, args=(peer, num_of_successful_replications))
+            threads.append(thread)
+            thread.start()
+        for thread in threads:
+            thread.join()
+        if 2 * num_of_successful_replications[0] > len(self.state.peers):
+            self.state.commit_index = current_index
+            print('Current commit index'.format(self.state.commit_index))
+            return True
+        return False
+
+    def call_peer_append_entries(self, peer, num_of_successful_replications):
+        try:
+            logger.info('Sending append entries to peer {}'.format(peer))
+            message = self._build_append_entries_message(peer)
+            response = peer.send_append_entries(message)
+            is_append_successful, peer_term_number, peer_next_index = response
+            # if I am not a leader at all
+            if not is_append_successful:
+                if peer_term_number > self.state.current_term:
+                    # demote to follower
+                    self.state.state_type = State.FOLLOWER
+                    # self.state.current_term = peer_term_number
+                    self.change_state_properties()
+                    # request forward to the true leader
+                    return False
+                elif peer_next_index is not None:
+                    # decrement next index for this peer
+                    self.state.next_index[(peer.host, peer.port)] = peer_next_index
+                    self.call_peer_append_entries(peer, num_of_successful_replications)
+            else:
+                # increment next index for this peer
+                self.state.next_index[(peer.host, peer.port)] += len(message['_entries'])
+                # increment match index for this peer
+                self.state.match_index[(peer.host, peer.port)] += 1
+                num_of_successful_replications[0] += 1
+        except Exception as e:
+            logger.error('Error sending append entries to peer {}'.format(e))
 
     def _build_append_entries_message(self, peer):
         peer = (peer.host, peer.port)
         term = self.state.current_term
         leader_id = self.state.server_id
-        prev_log_index = len(self.state.log) - 2
+        prev_log_index = self.state.next_index[peer] - 1
         prev_log_term = self.state.log[prev_log_index].term_number
-        entries = self.state.log[self.state.next_index[peer] - 1:]
+        entries = self.state.log[prev_log_index + 1:]
         leader_commit = self.state.commit_index
         return AppendEntriesMessage(term, leader_id, prev_log_index, prev_log_term, entries, leader_commit)
 
