@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import threading
@@ -160,9 +161,8 @@ class ConsensusModule(RPCServer):
 
 
     def redirect_message(self, message):
-        print('Redirect message received')
-        print(message)
-
+        logging.info('Redirect message received to leader {}'.format(self.state.leader_id))
+        return self.append_entries(message)
     # ==================================================================================
     # RPC SENDERS
     # ==================================================================================
@@ -201,7 +201,6 @@ class ConsensusModule(RPCServer):
         return State.CANDIDATE, self.state.current_term
 
     # SEND REDIRECT MESSAGE
-
     def send_redirect_message(self, peer, command):
         try:
             peer.send_redirect_message(command)
@@ -212,6 +211,7 @@ class ConsensusModule(RPCServer):
     def send_append_entries(self, command):
         # check if I am leader if no redirect to leader
         if self.state.state_type != State.LEADER:
+            logger.info('Redirecting command {} to leader {}'.format(command, self.state.leader_id))
             for peer in self.state.peers:
                 if peer.host == self.state.leader_id[0] and peer.port == self.state.leader_id[1]:
                     return self.send_redirect_message(peer, command)
