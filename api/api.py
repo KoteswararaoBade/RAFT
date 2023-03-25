@@ -23,10 +23,21 @@ class Service:
         self.dict = {}
 
     def get(self, item_id):
-        return "hello"
+        if item_id in self.dict:
+            return self.dict[item_id]
+        return None
     def put(self, key, value):
         command = {"command": "put", "key": key, "value": value}
         result = self.consensus_module.send_append_entries(command)
+        if result:
+            self.dict[key] = value
+        return result
+
+    def delete(self, key):
+        command = {"command": "delete", "key": key}
+        result = self.consensus_module.send_append_entries(command)
+        if result:
+            self.dict.pop(key)
         return result
 
     def run_consensus_module(self):

@@ -162,7 +162,8 @@ class ConsensusModule(RPCServer):
 
     def redirect_message(self, message):
         logging.info('Redirect message received to leader {}'.format(self.state.leader_id))
-        return self.append_entries(message)
+        print(message)
+        return self.send_append_entries(message)
     # ==================================================================================
     # RPC SENDERS
     # ==================================================================================
@@ -221,6 +222,7 @@ class ConsensusModule(RPCServer):
         current_index = len(self.state.log) - 1
         threads = []
         num_of_successful_replications = [1]
+        print(self.state.peers)
         for peer in self.state.peers:
             thread = threading.Thread(target=self.call_peer_append_entries, args=(peer, num_of_successful_replications))
             threads.append(thread)
