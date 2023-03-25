@@ -1,14 +1,9 @@
-import threading
-
-from network.server import Server
-from network.client import Client
-
 import random
 import time
 from socketserver import ThreadingMixIn
 from xmlrpc.server import SimpleXMLRPCServer
 
-from state.follower import Follower
+from state.state import State
 
 
 class SimpleThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
@@ -25,7 +20,7 @@ def sleep():
 
 # run server
 def run_server(host="localhost", port=8000):
-    follower1 = Follower(host, port, None, None)
+    follower1 = State(host, port, None)
     follower1.start()
     follower1.start_timer()
 
