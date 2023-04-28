@@ -54,7 +54,7 @@ class Service:
 
     def start_server(self):
         threading.Thread(target=self.run_consensus_module).start()
-        uvicorn.run(app, host="localhost", port=config_json['peers'][server_number]['port'] + 80)
+        uvicorn.run(app, host="localhost", port=config_json['peers'][server_number]['port'] + 1000)
 
 
 if __name__ == '__main__':
