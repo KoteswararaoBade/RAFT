@@ -1,5 +1,6 @@
 import json
 import threading
+import argparse
 
 import uvicorn
 from fastapi import FastAPI, APIRouter
@@ -41,21 +42,26 @@ class Service:
         return result
 
     def run_consensus_module(self):
-        config_json = process_json_config('../config.json')
-        peers = [(peer['host'], peer['port']) for peer in config_json['peers']]
+        peers = [(peer['host'], peer['port']) for i, peer in enumerate(config_json['peers']) if i != server_number]
         election_timeout_range = config_json['election_timeout_range']
         heartbeat_interval = config_json['heartbeat_interval']
         sleep_time = config_json['sleep_time']
-        self.consensus_module = ConsensusModule(config_json['host'], config_json['port'], peers, election_timeout_range,
+        host = config_json['peers'][server_number]['host']
+        port = config_json['peers'][server_number]['port']
+        self.consensus_module = ConsensusModule(host, port, peers, election_timeout_range,
                                     heartbeat_interval, sleep_time)
         self.consensus_module.start()
 
     def start_server(self):
         threading.Thread(target=self.run_consensus_module).start()
-        uvicorn.run(app, host="localhost", port=8000)
+        uvicorn.run(app, host="localhost", port=config_json['peers'][server_number]['port'] + 80)
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    config_json = process_json_config('./config.json')
+    parser.add_argument("-id", "-i", help="server number", type=int)
+    server_number = parser.parse_args().id
     service = Service()
     app.include_router(service.router)
     service.start_server()

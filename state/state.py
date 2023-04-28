@@ -30,7 +30,7 @@ class State:
         self._state_type = None
 
         # leader state
-        self._next_index = {(peer[0], peer[1]): len(self.log) + 1 for peer in peers}
+        self._next_index = {(peer[0], peer[1]): len(self.log) for peer in peers}
         self._match_index = {(peer[0], peer[1]): 0 for peer in peers}
 
     @property

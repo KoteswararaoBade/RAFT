@@ -1,9 +1,7 @@
 {
-  "host": "10.181.90.207",
-  "port": 8080,
   "peers": [
-    {"host": "10.181.89.149", "port": 8080},
-    {"host": "10.181.88.195", "port": 8080}
+    {"host": "127.0.0.1", "port": 8000},
+    {"host": "127.0.0.1", "port": 8001}
   ],
   "election_timeout_range": [5000, 8000],
   "heartbeat_interval": 1000,

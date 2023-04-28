@@ -52,7 +52,7 @@ class ConsensusModule(RPCServer):
         if self.state.state_type == State.FOLLOWER:
             self.state.total_votes = 0
         elif self.state.state_type == State.LEADER:
-            self.state.next_index = {(peer.host, peer.port): len(self.state.log) + 1 for peer in self.state.peers}
+            self.state.next_index = {(peer.host, peer.port): len(self.state.log) for peer in self.state.peers}
             self.state.match_index = {(peer.host, peer.port): 0 for peer in self.state.peers}
 
     def reset_timer(self):
@@ -126,7 +126,7 @@ class ConsensusModule(RPCServer):
         return True, self.state.current_term
 
     def append_entries(self, message):
-        print('Received append entries request message {}'.format(message))
+        logger.info('Received append entries request message {}'.format(message))
         leader_term_number = message['_term_number']
         leader_id = message['_leader_id']
         leader_prev_log_index = message['_prev_log_index']
@@ -134,12 +134,10 @@ class ConsensusModule(RPCServer):
         if leader_term_number < self.state.current_term:
             return False, self.state.current_term, None
         if len(self.state.log) <= leader_prev_log_index:
-            print('Rejecting append entries request as peer log is shorter than leader log')
-            print('Peer log: {}'.format(self.state.log))
+            logger.info('Rejecting append entries request as peer log is shorter than leader log')
             return False, self.state.current_term, len(self.state.log)
         if self.state.log[leader_prev_log_index].term_number != leader_prev_log_term:
-            print('Rejecting append entries request as peer log is not in sync with leader log')
-            print('Peer log: {}'.format(self.state.log))
+            logger.info('Rejecting append entries request as peer log is not in sync with leader log')
             mismatched_term_number = self.state.log[leader_prev_log_index].term_number
             index = leader_prev_log_index
             while self.state.log[index].term_number == mismatched_term_number:
@@ -156,14 +154,14 @@ class ConsensusModule(RPCServer):
         # if leader's commit index is greater than peer's commit index, then update peer's commit index
         if message['_leader_commit'] > self.state.commit_index:
             self.state.commit_index = min(message['_leader_commit'], len(self.state.log) - 1)
-        print("log: {}".format(self.state.log))
+        logger.info("Log length: {}".format(len(self.state.log)))
         return True, self.state.current_term, None
 
 
     def redirect_message(self, message):
         logging.info('Redirect message received to leader {}'.format(self.state.leader_id))
-        print(message)
         return self.send_append_entries(message)
+
     # ==================================================================================
     # RPC SENDERS
     # ==================================================================================
@@ -210,19 +208,12 @@ class ConsensusModule(RPCServer):
 
     # SEND APPEND ENTRIES RPC
     def send_append_entries(self, command):
-        # check if I am leader if no redirect to leader
-        if self.state.state_type != State.LEADER:
-            logger.info('Redirecting command {} to leader {}'.format(command, self.state.leader_id))
-            for peer in self.state.peers:
-                if peer.host == self.state.leader_id[0] and peer.port == self.state.leader_id[1]:
-                    return self.send_redirect_message(peer, command)
         # insert this command in the log
         log_entry = LogEntry(self.state.current_term, command)
         self.state.log.append(log_entry)
         current_index = len(self.state.log) - 1
         threads = []
         num_of_successful_replications = [1]
-        print(self.state.peers)
         for peer in self.state.peers:
             thread = threading.Thread(target=self.call_peer_append_entries, args=(peer, num_of_successful_replications))
             threads.append(thread)
@@ -256,7 +247,7 @@ class ConsensusModule(RPCServer):
                     self.call_peer_append_entries(peer, num_of_successful_replications)
             else:
                 # increment next index for this peer
-                self.state.next_index[(peer.host, peer.port)] += len(message['_entries'])
+                self.state.next_index[(peer.host, peer.port)] += len(message.entries)
                 # increment match index for this peer
                 self.state.match_index[(peer.host, peer.port)] += 1
                 num_of_successful_replications[0] += 1

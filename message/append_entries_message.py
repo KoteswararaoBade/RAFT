@@ -33,3 +33,6 @@ class AppendEntriesMessage(Message):
 
     def __str__(self):
         return "AppendEntriesMessage[ leader id: %s, prev log index: %s, prev log term: %s, entries: %s, leader commit: %s ]" % (self.leader_id, self.prev_log_index, self.prev_log_term, self.entries, self.leader_commit)
+
+    def __repr__(self):
+        return self.__str__()
