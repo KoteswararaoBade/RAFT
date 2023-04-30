@@ -9,7 +9,7 @@ from log.log import LogEntry
 from message.append_entries_message import AppendEntriesMessage
 from message.request_vote_message import RequestVoteMessage
 from state.state import State
-from api.storage import data
+from util.storage import data
 
 from util.rpcutil import RPCServer
 from util.loggingutil import LoggingUtil
