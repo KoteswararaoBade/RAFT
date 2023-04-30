@@ -9,6 +9,8 @@ from consensus.module import ConsensusModule
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.storage import data
+
 app = FastAPI()
 
 origins = ["*"]
@@ -29,29 +31,27 @@ def process_json_config(filename):
 
 class Service:
     def __init__(self):
-        self.data = {}
         self.consensus_module = None
         self.router = APIRouter()
         self.router.add_api_route("/get/{item_id}", self.get, methods=["GET"])
         self.router.add_api_route("/put/{key}/{value}", self.put, methods=["GET"])
-        self.dict = {}
 
     def get(self, item_id):
-        if item_id in self.dict:
-            return self.dict[item_id]
+        if item_id in data:
+            return data[item_id]
         return None
     def put(self, key, value):
         command = {"command": "put", "key": key, "value": value}
         result = self.consensus_module.send_append_entries(command)
         if result:
-            self.dict[key] = value
+            data[key] = value
         return result
 
     def delete(self, key):
         command = {"command": "delete", "key": key}
         result = self.consensus_module.send_append_entries(command)
         if result:
-            self.dict.pop(key)
+            data.pop(key)
         return result
 
     def run_consensus_module(self):

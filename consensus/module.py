@@ -9,6 +9,7 @@ from log.log import LogEntry
 from message.append_entries_message import AppendEntriesMessage
 from message.request_vote_message import RequestVoteMessage
 from state.state import State
+from api.storage import data
 
 from util.rpcutil import RPCServer
 from util.loggingutil import LoggingUtil
@@ -151,12 +152,14 @@ class ConsensusModule(RPCServer):
         entries = message['_entries']
         for entry in entries:
             self.state.log.append(LogEntry(entry['_term_number'], entry['_command']))
+            command = entry['_command']
+            if command['command'] == 'put':
+                data[command['key']] = command['value']
         # if leader's commit index is greater than peer's commit index, then update peer's commit index
         if message['_leader_commit'] > self.state.commit_index:
             self.state.commit_index = min(message['_leader_commit'], len(self.state.log) - 1)
         logger.info("Log length: {}".format(len(self.state.log)))
         return True, self.state.current_term, None
-
 
     def redirect_message(self, message):
         logging.info('Redirect message received to leader {}'.format(self.state.leader_id))
