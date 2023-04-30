@@ -7,7 +7,20 @@ from fastapi import FastAPI, APIRouter
 
 from consensus.module import ConsensusModule
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def process_json_config(filename):
     with open(filename) as f:
@@ -54,12 +67,12 @@ class Service:
 
     def start_server(self):
         threading.Thread(target=self.run_consensus_module).start()
-        uvicorn.run(app, host="localhost", port=config_json['peers'][server_number]['port'] + 1000)
+        uvicorn.run(app, host=config_json['peers'][server_number]['host'], port=config_json['peers'][server_number]['port'] + 1000)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    config_json = process_json_config('./config.json')
+    config_json = process_json_config('../config.json')
     parser.add_argument("-id", "-i", help="server number", type=int)
     server_number = parser.parse_args().id
     service = Service()

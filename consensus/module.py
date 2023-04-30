@@ -208,6 +208,8 @@ class ConsensusModule(RPCServer):
 
     # SEND APPEND ENTRIES RPC
     def send_append_entries(self, command):
+        if self.state.state_type != State.LEADER:
+            return False
         # insert this command in the log
         log_entry = LogEntry(self.state.current_term, command)
         self.state.log.append(log_entry)
